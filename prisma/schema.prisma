@@ -1,0 +1,72 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Post {
+  id           String    @id @default(cuid())
+  platform     String    @default("instagram")
+  title        String    @default("")
+  caption      String
+  postType     String    @default("static")
+  status       String    @default("draft")
+  scheduledAt  DateTime?
+  publishedAt  DateTime?
+  tags         String    @default("[]")
+  thumbnailUrl String    @default("")
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+model AnalyticsSnapshot {
+  id             String   @id @default(cuid())
+  date           DateTime
+  platform       String   @default("all")
+  impressions    Int      @default(0)
+  engagementRate Float    @default(0)
+  followers      Int      @default(0)
+  newFollowers   Int      @default(0)
+  topPostId      String   @default("")
+  createdAt      DateTime @default(now())
+}
+
+model Competitor {
+  id               String   @id @default(cuid())
+  handle           String   @unique
+  platforms        String   @default("[]")
+  followerCount    Int      @default(0)
+  avgEngagement    Float    @default(0.0)
+  postingFrequency Float    @default(0.0)
+  growthRate       Float    @default(0.0)
+  notes            String   @default("")
+  lastScrapedAt    DateTime @default(now())
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model NewsItem {
+  id          String   @id @default(cuid())
+  title       String
+  url         String   @unique
+  source      String
+  summary     String
+  topic       String   @default("tools")
+  publishedAt DateTime
+  isSaved     Boolean  @default(false)
+  createdAt   DateTime @default(now())
+}
+
+model Workspace {
+  id                 String   @id @default(cuid())
+  name               String   @default("")
+  platforms          String   @default("[]")
+  niche              String   @default("")
+  newsTopics         String   @default("tools,research,business")
+  onboardingComplete Boolean  @default(false)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
