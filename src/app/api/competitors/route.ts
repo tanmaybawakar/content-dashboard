@@ -1,28 +1,84 @@
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { NextRequest, NextResponse } from 'next/server'
+import { getCompetitors, createCompetitor, deleteCompetitor } from '@/lib/db/queries'
 
-export async function GET() {
-  const competitors = await prisma.competitor.findMany({
-    orderBy: { createdAt: "desc" },
-  });
-  return NextResponse.json(competitors);
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url)
+    const niche = searchParams.get('niche')
+
+    const { data, error } = await getCompetitors()
+
+    if (error) {
+      return NextResponse.json({ success: false, error: error.message }, { status: 500 })
+    }
+
+    const filtered = niche ? data.filter(c => c.niche === niche) : data
+
+    return NextResponse.json({ success: true, data: filtered })
+  } catch (error) {
+    return NextResponse.json(
+      { success: false, error: 'Failed to fetch competitors' },
+      { status: 500 }
+    )
+  }
 }
 
 export async function POST(request: NextRequest) {
-  const body = await request.json();
+  try {
+    const body = await request.json()
+    const { name, platform, handle, url, niche } = body
 
-  // TODO: Integrate real public API scrapers for follower/engagement data
-  const competitor = await prisma.competitor.create({
-    data: {
-      handle: body.handle,
-      platforms: body.platforms || "[]",
-      followerCount: body.followerCount || 0,
-      avgEngagement: body.avgEngagement || 0,
-      postingFrequency: body.postingFrequency || 0,
-      growthRate: body.growthRate || 0,
-      notes: body.notes || "",
-    },
-  });
+    if (!name || !platform) {
+      return NextResponse.json(
+        { success: false, error: 'name and platform are required' },
+        { status: 400 }
+      )
+    }
 
-  return NextResponse.json(competitor, { status: 201 });
+    const { data, error } = await createCompetitor({
+      name,
+      platform,
+      handle,
+      url,
+      niche
+    })
+
+    if (error) {
+      return NextResponse.json({ success: false, error: error.message }, { status: 500 })
+    }
+
+    return NextResponse.json({ success: true, data })
+  } catch (error) {
+    return NextResponse.json(
+      { success: false, error: 'Failed to create competitor' },
+      { status: 500 }
+    )
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const body = await request.json()
+    const { id } = body
+
+    if (!id) {
+      return NextResponse.json(
+        { success: false, error: 'id is required' },
+        { status: 400 }
+      )
+    }
+
+    const { error } = await deleteCompetitor(id)
+
+    if (error) {
+      return NextResponse.json({ success: false, error: error.message }, { status: 500 })
+    }
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    return NextResponse.json(
+      { success: false, error: 'Failed to delete competitor' },
+      { status: 500 }
+    )
+  }
 }

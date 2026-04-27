@@ -1,182 +1,220 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
-import {
-  Camera,
-  BarChart3,
-  CalendarDays,
-  Users,
-  Newspaper,
-  ArrowRight,
-  Sparkles,
-  Plus,
-} from "lucide-react";
-import { GlassCard } from "@/components/glass-card";
-import { SectionHeader } from "@/components/section-header";
-import { Button } from "@/components/ui/button";
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import StatCard from '@/components/StatCard';
+import IdeaCard from '@/components/IdeaCard';
+import CompetitorRow from '@/components/CompetitorRow';
+import CalendarGrid from '@/components/CalendarGrid';
+import LoadingSkeleton from '@/components/LoadingSkeleton';
+import MiniSparkline from '@/components/MiniSparkline';
+import { useIdeas } from '@/hooks/useIdeas';
+import { useCompetitors } from '@/hooks/useCompetitors';
+import { useCalendar } from '@/hooks/useCalendar';
+import { useTrends } from '@/hooks/useTrends';
 
-interface DashboardStats {
-  totalPosts: number;
-  scheduledPosts: number;
-  draftPosts: number;
-  totalCompetitors: number;
-  totalNews: number;
-  workspaceName: string;
+// Define types for our data
+interface Stat {
+  value: number;
+  title: string;
+  trend: 'up' | 'down';
+  sparklineData: number[];
+}
+
+interface TrendReport {
+  id: string;
+  title: string;
+  summary: string;
+  topics: string[];
+  score: number;
 }
 
 export default function Home() {
-  const [stats, setStats] = useState<DashboardStats>({
-    totalPosts: 0,
-    scheduledPosts: 0,
-    draftPosts: 0,
-    totalCompetitors: 0,
-    totalNews: 0,
-    workspaceName: "",
-  });
-  const [loaded, setLoaded] = useState(false);
+  const { ideas, loading: ideasLoading } = useIdeas();
+  const { competitors, loading: competitorsLoading } = useCompetitors();
+  const { events, loading: eventsLoading } = useCalendar();
+  const { trends, loading: trendsLoading } = useTrends();
 
-  useEffect(() => {
-    async function load() {
-      const [postsRes, competitorsRes, newsRes, workspaceRes] = await Promise.all([
-        fetch("/api/posts"),
-        fetch("/api/competitors"),
-        fetch("/api/news"),
-        fetch("/api/workspace"),
-      ]);
-      const posts = await postsRes.json();
-      const competitors = await competitorsRes.json();
-      const news = await newsRes.json();
-      const workspace = await workspaceRes.json();
-
-      setStats({
-        totalPosts: posts.length,
-        scheduledPosts: posts.filter(
-          (p: { status: string }) => p.status === "scheduled"
-        ).length,
-        draftPosts: posts.filter(
-          (p: { status: string }) => p.status === "draft"
-        ).length,
-        totalCompetitors: competitors.length,
-        totalNews: news.length,
-        workspaceName: workspace.name || "",
-      });
-      setLoaded(true);
-    }
-    load();
-  }, []);
-
-  const isEmpty = loaded && stats.totalPosts === 0 && stats.totalCompetitors === 0;
-
-  const sections = [
+  // Calculate stats for the top bar
+  const stats: Stat[] = [
     {
-      title: "Instagram Manager",
-      href: "/instagram",
-      icon: Camera,
-      desc: "Create, schedule, and manage posts across platforms.",
-      stat: `${stats.totalPosts}`,
-      statLabel: "posts",
-      primary: true,
+      value: ideas.length,
+      title: 'Total Content Ideas',
+      trend: 'up',
+      sparklineData: [10, 15, 12, 18, 20, 25, 30],
     },
     {
-      title: "Analytics",
-      href: "/analytics",
-      icon: BarChart3,
-      desc: "Track impressions, engagement, and follower growth.",
-      stat: stats.scheduledPosts > 0 ? `${stats.scheduledPosts}` : "—",
-      statLabel: "scheduled",
+      value: ideas.filter(idea =>
+        new Date(idea.createdAt) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+      ).length,
+      title: 'Ideas This Week',
+      trend: 'up',
+      sparklineData: [5, 3, 7, 6, 8, 9, 10],
     },
     {
-      title: "Content Calendar",
-      href: "/calendar",
-      icon: CalendarDays,
-      desc: "Monthly overview of your content pipeline.",
-      stat: stats.draftPosts > 0 ? `${stats.draftPosts}` : "—",
-      statLabel: "drafts",
+      value: competitors.length,
+      title: 'Competitors Tracked',
+      trend: 'up',
+      sparklineData: [2, 3, 4, 5, 6, 7, 8],
     },
     {
-      title: "Competitor Tracker",
-      href: "/competitors",
-      icon: Users,
-      desc: "Monitor competitor accounts and growth.",
-      stat: `${stats.totalCompetitors}`,
-      statLabel: "tracked",
-    },
-    {
-      title: "News Consolidator",
-      href: "/news",
-      icon: Newspaper,
-      desc: "Stay current with industry news and trends.",
-      stat: `${stats.totalNews}`,
-      statLabel: "articles",
+      value: events.filter(event =>
+        new Date(event.date).getMonth() === new Date().getMonth()
+      ).length,
+      title: 'Scheduled This Month',
+      trend: 'up',
+      sparklineData: [3, 5, 4, 6, 7, 8, 9],
     },
   ];
 
-  return (
-    <div>
-      <SectionHeader
-        title={stats.workspaceName || "Dashboard"}
-        description="Your content command center."
-      />
+  // Get trending now data
+  const trendingNow = trends.slice(0, 3);
 
-      {isEmpty && loaded ? (
-        /* Empty state — guide user to start */
-        <div className="max-w-lg mx-auto mt-12">
-          <GlassCard className="p-8 text-center">
-            <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-amber-300/20 to-amber-600/10 border border-amber-400/20 flex items-center justify-center mx-auto mb-5">
-              <Sparkles className="h-6 w-6 text-amber-400/80" />
+  // Get competitor pulse data
+  const competitorPulse = competitors.slice(0, 3).map(competitor => ({
+    ...competitor,
+    status: new Date().getTime() - new Date(competitor.lastScrapedAt || '').getTime() < 24 * 60 * 60 * 1000 ? 'green' : 'yellow',
+  }));
+
+  // Get upcoming scheduled data
+  const upcomingScheduled = events.filter(event =>
+    new Date(event.date) >= new Date() &&
+    new Date(event.date) <= new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+  ).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+  return (
+    <div className="p-6">
+      {/* Top Stats Bar */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        {stats.map((stat, index) => (
+          <StatCard
+            key={index}
+            title={stat.title}
+            value={stat.value}
+            trend={stat.trend}
+          >
+            <div className="mt-2 h-10">
+              <MiniSparkline data={stat.sparklineData} width={100} height={40} />
             </div>
-            <h2 className="text-lg font-bold mb-2">Your workspace is ready</h2>
-            <p className="text-sm text-muted-foreground leading-relaxed mb-6">
-              Start by creating your first post or adding a competitor to track.
-              Everything you need is in the sidebar.
-            </p>
-            <div className="flex flex-col gap-2">
-              <Link href="/instagram">
-                <Button className="w-full gap-2">
-                  <Plus className="h-4 w-4" /> Create your first post
-                </Button>
-              </Link>
-              <Link href="/competitors">
-                <Button variant="outline" className="w-full gap-2">
-                  <Users className="h-4 w-4" /> Add a competitor
-                </Button>
-              </Link>
-            </div>
-          </GlassCard>
-        </div>
-      ) : (
-        /* Dashboard cards */
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {sections.map((card) => {
-            const Icon = card.icon;
-            return (
-              <Link key={card.href} href={card.href}>
-                <GlassCard hoverable className="p-5 h-full">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center">
-                      <Icon className="h-4 w-4 text-primary" />
+          </StatCard>
+        ))}
+      </div>
+
+      {/* Main Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+        {/* Left column - Content Pipeline */}
+        <div className="lg:col-span-2">
+          <Card className="bg-[var(--bg-surface)] border-[var(--bg-border)]">
+            <CardHeader>
+              <CardTitle>Content Pipeline</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {ideasLoading ? (
+                <LoadingSkeleton count={3} height="120px" />
+              ) : (
+                <div className="flex space-x-4 overflow-x-auto pb-4">
+                  {/* Idea status lanes */}
+                  {['idea', 'drafted', 'scheduled', 'published'].map(status => (
+                    <div key={status} className="min-w-[250px]">
+                      <h3 className="text-sm font-semibold mb-3 capitalize">{status}</h3>
+                      <div className="space-y-3">
+                        {ideas
+                          .filter(idea => idea.status === status)
+                          .slice(0, 4)
+                          .map(idea => (
+                            <IdeaCard key={idea.id} idea={idea} />
+                          ))}
+                      </div>
                     </div>
-                    <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                  </div>
-                  <h3 className="font-semibold mb-1">{card.title}</h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    {card.desc}
-                  </p>
-                  <div className="flex items-baseline gap-1.5">
-                    <span className="text-lg font-bold golden-text">
-                      {card.stat}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      {card.statLabel}
-                    </span>
-                  </div>
-                </GlassCard>
-              </Link>
-            );
-          })}
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
-      )}
+
+        {/* Right column - Trending Now & Competitor Pulse */}
+        <div className="space-y-6">
+          {/* Trending Now */}
+          <Card className="bg-[var(--bg-surface)] border-[var(--bg-border)]">
+            <CardHeader>
+              <div className="flex justify-between items-center">
+                <CardTitle>Trending Now</CardTitle>
+                <button className="text-sm text-[var(--accent-secondary)] hover:text-[var(--accent-primary)]">
+                  Refresh
+                </button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {trendsLoading ? (
+                <LoadingSkeleton count={3} height="80px" />
+              ) : (
+                <div className="space-y-3">
+                  {trendingNow.map(trend => (
+                    <div key={trend.id} className="p-3 rounded-lg bg-[var(--bg-elevated)]">
+                      <h4 className="font-semibold mb-1">{trend.title}</h4>
+                      <p className="text-sm text-[var(--text-secondary)] mb-2">{trend.description}</p>
+                      <div className="flex flex-wrap gap-1">
+                        {trend.relatedTopics?.slice(0, 3).map(topic => (
+                          <span key={topic} className="px-2 py-1 text-xs bg-[var(--accent-secondary)]/20 text-[var(--accent-secondary)] rounded-full">
+                            {topic}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Competitor Pulse */}
+          <Card className="bg-[var(--bg-surface)] border-[var(--bg-border)]">
+            <CardHeader>
+              <CardTitle>Competitor Pulse</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {competitorsLoading ? (
+                <LoadingSkeleton count={3} height="60px" />
+              ) : (
+                <div className="space-y-3">
+                  {competitorPulse.map(competitor => (
+                    <CompetitorRow key={competitor.id} competitor={competitor} />
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* Bottom row - Upcoming Scheduled */}
+      <div className="mb-6">
+        <Card className="bg-[var(--bg-surface)] border-[var(--bg-border)]">
+          <CardHeader>
+            <CardTitle>Upcoming Scheduled</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {eventsLoading ? (
+              <LoadingSkeleton count={1} height="100px" />
+            ) : (
+              <div className="flex space-x-4 overflow-x-auto pb-4">
+                {upcomingScheduled.map(event => (
+                  <div key={event.id} className="min-w-[120px] p-3 rounded-lg bg-[var(--bg-elevated)]">
+                    <div className="text-sm font-semibold mb-1">{new Date(event.date).toLocaleDateString()}</div>
+                    <div className="text-xs text-[var(--text-secondary)] mb-1">{event.title}</div>
+                    <div className="flex items-center gap-1">
+                      <div className={`w-3 h-3 rounded-full ${event.platform === 'YouTube' ? 'bg-red-500' : event.platform === 'Instagram' ? 'bg-purple-500' : event.platform === 'Twitter' ? 'bg-blue-500' : event.platform === 'LinkedIn' ? 'bg-blue-700' : 'bg-black'}`}></div>
+                      <span className="text-xs">{event.platform}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

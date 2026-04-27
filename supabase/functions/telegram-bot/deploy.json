@@ -1,0 +1,16 @@
+{
+  "deployments": [
+    {
+      "name": "telegram-bot",
+      "main_file": "index.ts",
+      "import_map": "import_map.json",
+      "env": {
+        "TELEGRAM_BOT_TOKEN": "$TELEGRAM_BOT_TOKEN",
+        "SUPABASE_URL": "$SUPABASE_URL",
+        "SUPABASE_ANON_KEY": "$SUPABASE_ANON_KEY",
+        "OPENROUTER_API_KEY": "$OPENROUTER_API_KEY",
+        "TAVILY_API_KEY": "$TAVILY_API_KEY"
+      }
+    }
+  ]
+}
